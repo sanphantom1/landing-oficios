@@ -6,19 +6,27 @@
 
   function hit(key) {
     var url = BASE + encodeURIComponent(key);
-    try {
-      // Abacus only increments on GET, so sendBeacon (POST) is not used.
-      // keepalive lets the request finish if the page is closing.
-      fetch(url, {
-        method: "GET",
-        mode: "no-cors",
-        keepalive: true,
-        cache: "no-store",
-        credentials: "omit"
-      }).catch(function () {});
-    } catch (e) {
-      try { (new Image()).src = url; } catch (e2) {}
+    function send(attempt) {
+      try {
+        // GET + CORS: Abacus allows any origin and only increments on GET
+        // (sendBeacon is POST, so it cannot be used). Retry a couple of
+        // times because the service occasionally returns 500.
+        fetch(url, {
+          method: "GET",
+          mode: "cors",
+          keepalive: true,
+          cache: "no-store",
+          credentials: "omit"
+        }).then(function (res) {
+          if (!res.ok && attempt < 2) {
+            setTimeout(function () { send(attempt + 1); }, 500 * (attempt + 1));
+          }
+        }).catch(function () {
+          if (attempt < 2) setTimeout(function () { send(attempt + 1); }, 500 * (attempt + 1));
+        });
+      } catch (e) {}
     }
+    send(0);
   }
 
   var path = (location.pathname || "").replace(/\/+$/, "");
